@@ -1,5 +1,5 @@
 #The file where the funcstacker came from.. Yes, I am aware Python has a few obscure functions that mirror mine..#
-from time import sleep as wait #DON'T QUESTION IT!!
+from time import sleep as wait
 import keyboard
 #import mouse
 #This is a compilation of useful library functions.
@@ -112,3 +112,7 @@ def funcstacker(*functions):
         else:
             combined += str(func) + " "
     return combined.strip()
+
+def intlimit(target: int = 4):
+    '''Finds the integer limit of the specified bit count and returns it in decimal.'''
+    return dbin(int("1"*target), 1) #i COULD use bin()[2:]. nahhhh mines better frfr
