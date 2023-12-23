@@ -22,12 +22,14 @@ filepath2 = "out.irdb"
 
 debug = False
 
-#Code variables#
 cpuname = "Iridium"
 linecount = 512
-sizeKiB = linecount/1024 #do not even think about touching this value
 filext = ".ird" #the dots are required!
 filextb = ".irdb"
+
+#Code variables#
+
+sizeKiB = linecount/1024 #do not even think about touching this value
 
 splitt = ""
 combined = ""
