@@ -74,7 +74,7 @@ isa = {
 }
 
 if askuser == True:
-    print(f"What is the file path to the input .ird file? (From root.)")
+    print(f"What is the file path to the input {filext} file? (From root.)")
     filepath = input("Enter here: ")
     print("What should the output file be named? (Accepts paths, by default relative to root.)")
     filepath2 = input("Enter here: ")
@@ -98,11 +98,13 @@ else:
 with open(filepath, "r") as file:
     lines = file.readlines()
     if len(lines) != 0:
-        if len(lines) < 512:
+        if len(lines) < linecount:
             for lnum, line in enumerate(lines, start=1):
                 line = line.strip()
                 if debug:
                     print(f"Processing line {lnum} (containing '{line}')")
+                if glib.letter(line, ";") != 0:
+                    line = line[:line.index(";")]
                 split = line.split()
                 instr = split[0]
                 if instr.upper() in isa:
