@@ -1,5 +1,14 @@
 import generaluselib as glib #Required, a custom made library.
 from math import ceil
+import sys #Exit
+
+class CustomError:
+    def __new__(cls, errorname):
+        return type(errorname, (Exception,), {"get_class_name": lambda self: self.__class__.__name__})
+
+moperror = CustomError("MismatchedOperandsError")
+ioperror = CustomError("InvalidOperandError")
+iopcerror = CustomError("InvalidOpcodeError")
 
 
          #### UNIVERSAL ASSEMBLER ####
@@ -22,10 +31,10 @@ filepath2 = "out.irdb"
 
 debug = False
 
-cpuname = "Iridium"
-linecount = 512
-filext = ".ird" #the dots are required!
-filextb = ".irdb"
+cpuname = "LightRISC-1 Capable CPU"
+linecount = 256
+filext = ".lr1" #the dots are required!
+filextb = ".lr1b"
 
 #Code variables#
 
@@ -45,46 +54,45 @@ else:
 # User ISA #
 
 isa = {
-    "MULTI": ("00000", ["bin1", "bin1", "bin1"]), #Binary Opcode | Operand[Number of bits]
-    "ADD":  ("00001", ["dec4"]),
-    "SUB":  ("00010", ["dec4"]),
-    "LDI":  ("00011", ["dec4", "dec8"]),
-    "LIA":  ("00100", ["dec8"]),
-    "ADR":  ("00101", ["dec4"]),
-    "SBR":  ("00110", ["dec4"]),
-    "AND":  ("00111", ["dec4"]),
-    "OR":   ("01000", ["dec4"]),
-    "XOR":  ("01001", ["dec4"]),
-    "LOAD": ("01010", ["dec4"]),
-    "STORE":("01011", ["dec4"]),
-    "IN":   ("01100", ["dec4"]),
-    "OUT":  ("01101", ["dec4"]),
-    "CMP":  ("01110", ["dec4"]),
-    "JMP":  ("01111", ["dec9"]),
-    "BRCH": ("10000", ["dec3", "dec9"]),
-    "ADC":  ("10001", ["dec4"]),
-    "SBB":  ("10010", ["dec4"]),
-    "NAND": ("10011", ["dec4"]),
-    "NOR":  ("10100", ["dec4"]),
-    "XNOR": ("10101", ["dec4"]),
-    "INC":  ("10110", []),
-    "DEC":  ("10111", []),
-    "SHIFT":("11000", ["bin1"]),
-    "BSB":  ("11001", ["dec4"]),
-    "RLD":  ("11010", ["dec4"]),
-    "RST":  ("11011", ["dec4"])
+    "PRINT": ("00000", ["dec3", "bin1", "bin1"]), #Binary Opcode | Operand[Number of bits]
+    "ADD":   ("00001", ["dec3"]),
+    "SUB":   ("00010", ["dec3"]),
+    "LDI":   ("00011", ["dec3", "dec8"]),
+    "LIA":   ("00100", ["dec8"]),
+    "AND":   ("00101", ["dec3"]),
+    "OR":    ("00110", ["dec3"]),
+    "XOR":   ("00111", ["dec3"]),
+    "ADC":   ("01000", ["dec3"]),
+    "SBB":   ("01001", ["dec3"]),
+    "ADR":   ("01010", ["dec3"]),
+    "SBR":   ("01011", ["dec3"]),
+    "CMP":   ("01100", ["dec3"]),
+    "BRNCH": ("01101", ["dec3", "dec3"]),
+    "NAND":  ("01110", ["dec3"]),
+    "NOR":   ("01111", ["dec3"]),
+    "XNOR":  ("10000", ["dec3"]),
+    "BSB":   ("10001", ["dec3"]),
+    "JMP":   ("10010", ["dec3"]),
 }
 
 if askuser == True:
-    print(f"What is the file path to the input {filext} file? (From root.)")
+    print(f"What is the file path to the input {filext} file? (From root.) Enter 'exit' on any input to quit.")
     filepath = input("Enter here: ")
+    if filepath == "exit":
+        sys.exit(0)
     print("What should the output file be named? (Accepts paths, by default relative to root.)")
     filepath2 = input("Enter here: ")
+    if filepath2 == "exit":
+        sys.exit(0)
 if askuser2 == True:
     print("What is the preferred output mode? (bin, hex)")
     mode = input("Enter here: ")
+    if mode == "exit":
+        sys.exit(0)
     print("How should the assembler output? One big number or split lines? (combined, split)")
     outmethod = input("Enter here: ")
+    if outmethod == "exit":
+        sys.exit(0)
 
 if glib.letter(filepath, ".") == 0:
     filepath += filext
@@ -96,6 +104,10 @@ if glib.letter(filepath2, ".") == 0:
 else:
     if filepath2[filepath2.index("."):] != filextb:
         raise NameError(f"The provided output file was not a supported format. ({filepath2[:filepath2.index('.')+1]})")
+if mode not in ["bin", "hex"]:
+    raise NameError("Invalid mode. (Must be either bin or hex.)")
+if outmethod not in ["split", "combined"]:
+    raise NameError("Invalid output method. (Must be either split or combined.)")
 
 with open(filepath, "r") as file:
     lines = file.readlines()
@@ -107,68 +119,73 @@ with open(filepath, "r") as file:
                     print(f"Processing line {lnum} (containing '{line}')")
                 if glib.letter(line, ";") != 0:
                     line = line[:line.index(";")]
-                split = line.split()
-                instr = split[0]
-                if instr.upper() in isa:
-                    if debug:
-                        print("Line was in ISA instructions.")
-                    bop, opfrm = isa[instr.upper()]
-                    if len(split)-1 != len(opfrm):
-                        raise SyntaxError(f"MismatchedOperandsError at line {lnum}: Expecting {len(opfrm)}, got {len(split)-1}")
-                    if mode == "bin":
-                        combined += bop
-                        splitt += bop + " "
-                    if mode == "hex":
-                        combined += glib.dhex(int(bop,2),2)
-                        splitt += glib.dhex(int(bop,2),2) + " "
-                    if debug:
-                        print("Going into match statement..")
-                    match len(opfrm):
-                        case 0:
-                            splitt = splitt[:-1] + "\n"
-                        case 1:
-                            if mode.lower() == "bin":
-                                if glib.funcstacker(glib.bitcomp(int(split[1]),int(opfrm[0][-1:]))) == "True":
-                                    combined += glib.dbin(int(split[1]),int(opfrm[0][-1:]))
-                                    splitt += glib.dbin(int(split[1]),int(opfrm[0][-1:])) + "\n"
-                                else:
-                                    raise SyntaxError(f"InvalidOperandError at line {lnum}: Input for operand 1 greater than integer limit of operand in decimal ({glib.intlimit(opfrm[0][-1:])}).")
-                            elif mode.lower() == "hex":
-                                if glib.funcstacker(glib.bitcomp(int(split[1]),int(opfrm[0][-1:]))) == "True":
-                                    combined += glib.dhex(int(split[1]),ceil(int(opfrm[0][-1:])/4))
-                                    splitt += glib.dhex(int(split[1]),ceil(int(opfrm[0][-1:])/4)) + "\n"
-                                else:
-                                    raise SyntaxError(f"InvalidOperandError at line {lnum}: Input for operand 1 greater than integer limit of operand in decimal ({glib.intlimit(opfrm[0][-1:])}).")
-                        case 2:
-                            if mode.lower() == "bin":
-                                if glib.funcstacker(glib.bitcomp(int(split[1]),int(opfrm[0][-1:])),glib.bitcomp(int(split[2]),int(opfrm[1][-1:]))) == "True True":
-                                    combined += glib.dbin(int(split[1]),int(opfrm[0][-1:]))+glib.dbin(int(split[2]),int(opfrm[1][-1:]))
-                                    splitt += glib.dbin(int(split[1]),int(opfrm[0][-1:]))+" "+glib.dbin(int(split[2]),int(opfrm[1][-1:])) + "\n"
-                                else:
-                                    raise SyntaxError(f"InvalidOperandError at line {lnum}: Input for operand 2 greater than integer limit of operand in decimal ({glib.intlimit(opfrm[1][-1:])}).")
-                            elif mode.lower() == "hex":
-                                if glib.funcstacker(glib.bitcomp(int(split[1]),int(opfrm[0][-1:])),glib.bitcomp(int(split[2]),int(opfrm[1][-1:]))) == "True True":
-                                    combined += glib.dhex(int(split[1]),ceil(int(opfrm[0][-1:])/4))+glib.dhex(int(split[2]),ceil(int(opfrm[1][-1:])/4))
-                                    splitt += glib.dhex(int(split[1]),ceil(int(opfrm[0][-1:])/4))+" "+glib.dhex(int(split[2]),ceil(int(opfrm[1][-1:])/4)) + "\n"
-                                else:
-                                    raise SyntaxError(f"InvalidOperandError at line {lnum}: Input for operand 2 greater than integer limit of operand in decimal ({glib.intlimit(opfrm[1][-1:])}).")
-                        case 3:
-                            if mode.lower() == "bin":
-                                if glib.funcstacker(glib.bitcomp(int(split[1]),int(opfrm[0][-1:])),glib.bitcomp(int(split[2]),int(opfrm[1][-1:])),glib.bitcomp(int(split[3]),int(opfrm[2][-1:]))) == "True True True":
-                                    combined += glib.dbin(int(split[1]),int(opfrm[0][-1:]))+glib.dbin(int(split[2]),int(opfrm[1][-1:]))+glib.dbin(int(split[2]),int(opfrm[2][-1:]))
-                                    splitt += glib.dbin(int(split[1]),int(opfrm[0][-1:]))+" "+glib.dbin(int(split[2]),int(opfrm[1][-1:]))+" "+glib.dbin(int(split[2]),int(opfrm[2][-1:])) + "\n"
-                                else:
-                                    raise SyntaxError(f"InvalidOperandError at line {lnum}: Input for operand 3 greater than integer limit of operand in decimal ({glib.intlimit(opfrm[2][-1:])}).")
-                            elif mode.lower() == "hex":
-                                if glib.funcstacker(glib.bitcomp(int(split[1]),int(opfrm[0][-1:])),glib.bitcomp(int(split[2]),int(opfrm[1][-1:])),glib.bitcomp(int(split[3]),int(opfrm[2][-1:]))) == "True True True":
-                                    combined += glib.dhex(int(split[1]),ceil(int(opfrm[0][-1:])/4))+glib.dhex(int(split[2]),ceil(int(opfrm[1][-1:])/4))+glib.dhex(int(split[3]),ceil(int(opfrm[2][-1:])/4))
-                                    splitt += glib.dhex(int(split[1]),ceil(int(opfrm[0][-1:])/4))+" "+glib.dhex(int(split[2]),ceil(int(opfrm[1][-1:])/4))+" "+glib.dhex(int(split[3]),ceil(int(opfrm[2][-1:])/4)) + "\n"
-                                else:
-                                    raise SyntaxError(f"InvalidOperandError at line {lnum}: Input for operand 3 greater than integer limit of operand in decimal ({glib.intlimit(opfrm[2][-1:])}).")
-                    if debug:
-                        print("Exiting match statement.")
+                if line != "":
+                    split = line.split()
+                    instr = split[0]
+                    if instr.upper() in isa:
+                        if debug:
+                            print("Line was in ISA instructions.")
+                        bop, opfrm = isa[instr.upper()]
+                        if len(split)-1 != len(opfrm):
+                            raise moperror(f"at line {lnum}: Expecting {len(opfrm)}, got {len(split)-1}")
+                        if mode == "bin":
+                            combined += bop
+                            splitt += bop + " "
+                        if mode == "hex":
+                            combined += glib.dhex(int(bop,2),2)
+                            splitt += glib.dhex(int(bop,2),2) + " "
+                        if debug:
+                            print("Going into match statement..")
+                        match len(opfrm):
+                            case 0:
+                                splitt = splitt[:-1] + "\n"
+                            case 1:
+                                if mode.lower() == "bin":
+                                    if glib.funcstacker(glib.bitcomp(int(split[1]),int(opfrm[0][-1:]))) == "True":
+                                        combined += glib.dbin(int(split[1]),int(opfrm[0][-1:]))
+                                        splitt += glib.dbin(int(split[1]),int(opfrm[0][-1:])) + "\n"
+                                    else:
+                                        raise ioperror(f"at line {lnum}: Input for operand 1 greater than integer limit of operand in decimal ({glib.intlimit(opfrm[0][-1:])}).")
+                                elif mode.lower() == "hex":
+                                    if glib.funcstacker(glib.bitcomp(int(split[1]),int(opfrm[0][-1:]))) == "True":
+                                        combined += glib.dhex(int(split[1]),ceil(int(opfrm[0][-1:])/4))
+                                        splitt += glib.dhex(int(split[1]),ceil(int(opfrm[0][-1:])/4)) + "\n"
+                                    else:
+                                        raise ioperror(f"at line {lnum}: Input for operand 1 greater than integer limit of operand in decimal ({glib.intlimit(opfrm[0][-1:])}).")
+                            case 2:
+                                if mode.lower() == "bin":
+                                    if glib.funcstacker(glib.bitcomp(int(split[1]),int(opfrm[0][-1:])),glib.bitcomp(int(split[2]),int(opfrm[1][-1:]))) == "True True":
+                                        combined += glib.dbin(int(split[1]),int(opfrm[0][-1:]))+glib.dbin(int(split[2]),int(opfrm[1][-1:]))
+                                        splitt += glib.dbin(int(split[1]),int(opfrm[0][-1:]))+" "+glib.dbin(int(split[2]),int(opfrm[1][-1:])) + "\n"
+                                    else:
+                                        raise ioperror(f"at line {lnum}: Input for operand 2 greater than integer limit of operand in decimal ({glib.intlimit(opfrm[1][-1:])}).")
+                                elif mode.lower() == "hex":
+                                    if glib.funcstacker(glib.bitcomp(int(split[1]),int(opfrm[0][-1:])),glib.bitcomp(int(split[2]),int(opfrm[1][-1:]))) == "True True":
+                                        combined += glib.dhex(int(split[1]),ceil(int(opfrm[0][-1:])/4))+glib.dhex(int(split[2]),ceil(int(opfrm[1][-1:])/4))
+                                        splitt += glib.dhex(int(split[1]),ceil(int(opfrm[0][-1:])/4))+" "+glib.dhex(int(split[2]),ceil(int(opfrm[1][-1:])/4)) + "\n"
+                                    else:
+                                        raise ioperror(f"at line {lnum}: Input for operand 2 greater than integer limit of operand in decimal ({glib.intlimit(opfrm[1][-1:])}).")
+                            case 3:
+                                if mode.lower() == "bin":
+                                    if glib.funcstacker(glib.bitcomp(int(split[1]),int(opfrm[0][-1:])),glib.bitcomp(int(split[2]),int(opfrm[1][-1:])),glib.bitcomp(int(split[3]),int(opfrm[2][-1:]))) == "True True True":
+                                        combined += glib.dbin(int(split[1]),int(opfrm[0][-1:]))+glib.dbin(int(split[2]),int(opfrm[1][-1:]))+glib.dbin(int(split[2]),int(opfrm[2][-1:]))
+                                        splitt += glib.dbin(int(split[1]),int(opfrm[0][-1:]))+" "+glib.dbin(int(split[2]),int(opfrm[1][-1:]))+" "+glib.dbin(int(split[2]),int(opfrm[2][-1:])) + "\n"
+                                    else:
+                                        raise ioperror(f"at line {lnum}: Input for operand 3 greater than integer limit of operand in decimal ({glib.intlimit(opfrm[2][-1:])}).")
+                                elif mode.lower() == "hex":
+                                    if glib.funcstacker(glib.bitcomp(int(split[1]),int(opfrm[0][-1:])),glib.bitcomp(int(split[2]),int(opfrm[1][-1:])),glib.bitcomp(int(split[3]),int(opfrm[2][-1:]))) == "True True True":
+                                        combined += glib.dhex(int(split[1]),ceil(int(opfrm[0][-1:])/4))+glib.dhex(int(split[2]),ceil(int(opfrm[1][-1:])/4))+glib.dhex(int(split[3]),ceil(int(opfrm[2][-1:])/4))
+                                        splitt += glib.dhex(int(split[1]),ceil(int(opfrm[0][-1:])/4))+" "+glib.dhex(int(split[2]),ceil(int(opfrm[1][-1:])/4))+" "+glib.dhex(int(split[3]),ceil(int(opfrm[2][-1:])/4)) + "\n"
+                                    else:
+                                        raise ioperror(f"at line {lnum}: Input for operand 3 greater than integer limit of operand in decimal ({glib.intlimit(opfrm[2][-1:])}).")
+                        if debug:
+                            print("Exiting match statement.")
+                    else:
+                        raise iopcerror(f"at line {lnum}: No matching opcode in ISA.")
                 else:
-                    raise SyntaxError(f"InvalidOperandError at line {lnum}: No matching opcode in ISA.")
+                    if debug:
+                        print("Line was empty.. Continuing.")
+                        continue
         else:
             raise ValueError(f"File was above the maximum {sizeKiB} ({linecount} line) limit of {cpuname}.")
     else:
