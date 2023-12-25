@@ -1,4 +1,3 @@
-#The file where the funcstacker came from.. Yes, I am aware Python has a few obscure functions that mirror mine..#
 from time import sleep as wait
 import keyboard
 #import mouse
